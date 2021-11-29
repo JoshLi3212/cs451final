@@ -1,4 +1,5 @@
 from hashlib import sha256
+from datetime import datetime
 
 def get_var_int(f):
     head = f.read(1)
@@ -92,7 +93,7 @@ class Block:
             self.version = f.read(4)[::-1].hex()
             self.prev_block_hash = f.read(32)[::-1].hex()
             self.merkle_root = f.read(32)[::-1].hex()
-            self.time = f.read(4)[::-1].hex()
+            self.time = datetime.fromtimestamp(int.from_bytes(f.read(4), "little")).strftime("%Y-%m-%d %H-%M-%S")
             self.n_bits = f.read(4)[::-1].hex()
             self.nonce = int.from_bytes(f.read(4), "little")
 
