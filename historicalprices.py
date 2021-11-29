@@ -19,7 +19,6 @@ end_hour = end_time.timestamp()
 f = open("historical.csv", "w")
 
 while start_hour < end_hour:
-    print(min(2000, (end_hour - start_hour) // 3600))
     params = {
         "api_key":API_KEY,
         "fsym":"BTC",
