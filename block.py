@@ -84,6 +84,10 @@ class Transaction:
         self.size = f.tell() - start_pos
         self.hash = blockchain_hash(transaction_bytes)
 
+        self.amount = 0
+        for output in self.outputs:
+            self.amount += output.value
+
 class Block:
     def __init__(self, path):
         with open(path, "rb") as f:
@@ -93,7 +97,7 @@ class Block:
             self.version = f.read(4)[::-1].hex()
             self.prev_block_hash = f.read(32)[::-1].hex()
             self.merkle_root = f.read(32)[::-1].hex()
-            self.time = datetime.fromtimestamp(int.from_bytes(f.read(4), "little")).strftime("%Y-%m-%d %H-%M-%S")
+            self.time = datetime.fromtimestamp(int.from_bytes(f.read(4), "little"))
             self.n_bits = f.read(4)[::-1].hex()
             self.nonce = int.from_bytes(f.read(4), "little")
 
