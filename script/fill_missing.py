@@ -1,7 +1,7 @@
 #!/bin/python3
 
 import sys
-from datetime import datetime, time, timedelta
+from datetime import datetime, timedelta
 
 file_path = sys.argv[1]
 

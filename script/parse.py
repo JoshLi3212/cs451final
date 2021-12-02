@@ -1,9 +1,9 @@
 #!/bin/python3
 
 import argparse
-import block
 import os
 import shutil
+import block
 from datetime import timedelta
 from pyspark import SparkContext, SparkConf
 
