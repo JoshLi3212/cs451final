@@ -16,7 +16,7 @@ URL = "https://min-api.cryptocompare.com/data/v2/histohour"
 start_hour = start_time.timestamp()
 end_hour = end_time.timestamp()
 
-f = open("historical.csv", "w")
+f = open("historical.csv", "a")
 
 while start_hour < end_hour:
     params = {
