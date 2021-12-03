@@ -6,7 +6,7 @@ import os
 import time
 
 path = "/u2/jeli/blockchain_data"
-num_blocks = int(sys.argv[1])
+min_height = int(sys.argv[1])
 temp_path = f"{path}/tmp.dat"
 
 def get_height_hash(height):
@@ -39,13 +39,16 @@ else:
 resp = requests.get(f"https://blockchain.info/rawblock/{block_hash}?format=json").json()
 assert height == int(resp["height"])
 
-for _ in range(num_blocks):
+while height >= min_height:
     while True:
         file_path = f"{path}/blk{height}.dat"
         if not os.path.exists(file_path):
             break
         print(f"Block at height {height} exists at {file_path}")
         height -= 1
+
+    if height < min_height:
+        break
 
     block_hash = get_height_hash(height)
     while not os.path.exists(file_path):
@@ -68,3 +71,6 @@ for _ in range(num_blocks):
         print(f"Block at height {height} downloaded to {file_path}")
         block_hash = get_prev_hash(binary)
         height -= 1
+        file_path = f"{path}/blk{height}.dat"
+        if height < min_height:
+            break

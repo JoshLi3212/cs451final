@@ -6,3 +6,5 @@ export PYTHONPATH=/u/cs451/packages/spark3/python
 export SPARK_HOME=/u/cs451/packages/spark3
 export PYSPARK_DRIVER_PYTHON=/usr/bin/python3
 export PYSPARK_PYTHON=/usr/bin/python3
+
+ulimit -t unlimited

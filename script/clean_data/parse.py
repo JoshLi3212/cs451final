@@ -9,7 +9,7 @@ from pyspark import SparkContext, SparkConf
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--input", default="/u2/jeli/blockchain_data")
-parser.add_argument("--output", type=str)
+parser.add_argument("--output", type=str, required=True)
 
 args = parser.parse_args()
 input_path = args.input
@@ -32,10 +32,10 @@ def block_to_transactions(block_path):
 
 transactions = blocks \
     .map(block_to_transactions) \
+    .filter(lambda kv: "2019-12-12 05" <= kv[0]) \
     .reduceByKey(lambda tup1, tup2: (tup1[0]+tup2[0], tup1[1]+tup2[1])) \
     .sortByKey() \
-    .map(lambda kv: (kv[0], kv[1][0], kv[1][1])) \
-    .map(lambda tup: ",".join(str(val) for val in tup)) \
+    .map(lambda kv: f"{kv[0]},{kv[1][0]},{kv[1][1]}") \
     .coalesce(1)
 
 if os.path.exists(output_path):
