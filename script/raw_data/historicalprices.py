@@ -36,6 +36,6 @@ while start_hour < end_hour:
         op = i["open"]
         volf = i["volumefrom"]
         volt = i["volumeto"]
-        print("{}, {}, {}, {}, {}, {}".format(datetime.datetime.fromtimestamp(time).strftime("%Y-%m-%d %H:%M:%S"), high, low, op, volf, volt))
+        print("{},{},{},{},{},{}".format(datetime.datetime.fromtimestamp(time).strftime("%Y-%m-%d %H:%M:%S"), high, low, op, volf, volt))
 
 
