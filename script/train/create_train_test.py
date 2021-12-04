@@ -1,5 +1,3 @@
-#!/bin/python3
-
 import argparse
 import os
 import shutil
@@ -35,7 +33,7 @@ def sub_hour(time):
 
 def safe_return(cur, prev):
     if prev == 0:
-        return 0
+        return 1000
     return (cur-prev)/prev
 
 def single_return(kv):
@@ -58,7 +56,8 @@ def calculate_return(file):
 
     rdd = rdd \
         .join(rdd_offset) \
-        .map(pair_return)
+        .map(pair_return) \
+        .filter(lambda kv: kv[1][0] < 1000 and kv[1][1] < 1000)
     return rdd
 
 transactions = calculate_return("transactions.csv")
@@ -74,7 +73,7 @@ btc_return = btc.join(btc_offset) \
     .map(single_return)
 btc_offset = btc.map(lambda kv: (sub_hour(kv[0]), kv[1]))
 btc_buy = btc.join(btc_offset) \
-    .map(lambda kv: (kv[0], kv[1][0] <= kv[1][1]))
+    .map(lambda kv: (kv[0], float(kv[1][0] <= kv[1][1])))
 btc = btc_return.join(btc_buy)
 
 def join_tuples(kv):
@@ -89,11 +88,11 @@ data.cache()
 
 train_data = data.filter(lambda kv: "2019-12-12 05" <= kv[0] < "2021-11-01 00") \
     .sortByKey() \
-    .map(lambda kv: kv[0] + "," + ",".join(str(val) for val in kv[1])) \
+    .map(lambda kv: ",".join(str(val) for val in reversed(kv[1]))) \
     .coalesce(1)
 test_data = data.filter(lambda kv: "2021-11-01 00" <= kv[0] < "2021-12-01 00") \
     .sortByKey() \
-    .map(lambda kv: kv[0] + "," + ",".join(str(val) for val in kv[1])) \
+    .map(lambda kv: ",".join(str(val) for val in reversed(kv[1]))) \
     .coalesce(1)
 
 if os.path.exists("train"):
