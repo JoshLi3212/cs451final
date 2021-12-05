@@ -1,77 +1,120 @@
+import os
+import shutil
+
 from pyspark import SparkConf
 from pyspark.sql import SparkSession
 from pyspark.ml.feature import VectorAssembler
-from pyspark.ml.classification import LogisticRegression, RandomForestClassifier, GBTClassifier, MultilayerPerceptronClassifier, FMClassifier
+from pyspark.ml.classification import LogisticRegression, DecisionTreeClassifier, RandomForestClassifier, GBTClassifier, MultilayerPerceptronClassifier, FMClassifier
 from pyspark.ml.evaluation import BinaryClassificationEvaluator
+from pyspark.ml.tuning import CrossValidator, ParamGridBuilder
 
-from sklearn.metrics import confusion_matrix
+SEED = 451
+INPUTS = 9
+NUM_MODELS = 6
+FOLDS = 5
 
-def spark_setup():
-    conf = SparkConf()
-    conf.set('spark.logConf', 'true')
+MAX_ITERS = [10, 100, 200]
+REG_PARAMS = [0, 0.1, 0.2]
+ELASTIC_NET_PARAMS = [0, 0.5, 1]
 
-    spark = SparkSession.builder.config(conf=conf).appName("Train models").getOrCreate()
-    spark.sparkContext.setLogLevel("ERROR")
-    return spark
+MAX_DEPTHS = [5, 10, 20]
+IMPURITIES = ["gini", "entropy"]
 
-def get_train_validate(spark, file):
-    spark = spark_setup()
+STEP_SIZES = [0.001, 0.01, 0.05, 0.1]
 
-    df = spark.read.csv(file, inferSchema=True)
-    df = df.withColumnRenamed("_c0", "label")
-    assembler = VectorAssembler(inputCols = [f"_c{n}" for n in range(1, 10)], outputCol="features")
-    df = assembler.transform(df)
-    df = df.select("label", "features")
-    return df.randomSplit([0.8, 0.2], seed=451)
+def cross_validate_save(model, paramGrid, model_path):
+    crossval = CrossValidator(
+        estimator=model,
+        estimatorParamMaps=paramGrid,
+        evaluator=BinaryClassificationEvaluator(metricName="areaUnderPR"),
+        numFolds=FOLDS,
+        seed=SEED
+    )
+    model = crossval.fit(train)
+    model.save(model_path)
 
-y_total = None
-def eval_model(model, validate):
-    global y_total
-    prediction = model.transform(validate)
-    y_predict = prediction.select("prediction").collect()
-    if y_total is None:
-        y_total = [y[0] for y in y_predict]
-    else:
-        for i, y in enumerate(y_predict):
-            y_total[i] += y[0]
+conf = SparkConf()
+conf.set('spark.logConf', 'true')
 
-    cm = confusion_matrix(y_true, y_predict)
-    print(cm)
-    print(f"Accuracy: {(cm[0][0]+cm[1][1])/cm.sum()}"
-        f", Precision: {cm[1][1]/(cm[1][1]+cm[0][1])}"
-        f", Recall: {cm[1][1]/(cm[1][1]+cm[1][0])}")
-    print()
+spark = SparkSession.builder.config(conf=conf).appName("Train models").getOrCreate()
+spark.sparkContext.setLogLevel("ERROR")
 
+df = spark.read.csv("train.csv", inferSchema=True)
+num_columns = len(df.columns)
 
-spark = spark_setup()
-train, validate = get_train_validate(spark, "train.csv")
-y_true = validate.select("label").collect()
+df = df.withColumnRenamed("_c0", "label")
+assembler = VectorAssembler(inputCols = [f"_c{n}" for n in range(num_columns - INPUTS, num_columns)], outputCol="features")
+df = assembler.transform(df)
+train = df.select("label", "features")
 
-lr = LogisticRegression(maxIter=100)
-lr_model = lr.fit(train)
-eval_model(lr_model, validate)
+model_path = "models/logistic_regression"
+if not os.path.exists(model_path):
+    lr = LogisticRegression()
+    paramGrid = ParamGridBuilder() \
+        .addGrid(lr.maxIter, MAX_ITERS) \
+        .addGrid(lr.regParam, REG_PARAMS) \
+        .addGrid(lr.elasticNetParam, ELASTIC_NET_PARAMS) \
+        .build()
+    cross_validate_save(lr, paramGrid, model_path)
+    print("Logistic regression model saved")
+else:
+    print("Logistic regression model already exists")
 
-rf = RandomForestClassifier(maxDepth=30, seed=451)
-rf_model = rf.fit(train)
-eval_model(rf_model, validate)
+model_path = "models/decision_tree"
+if not os.path.exists(model_path):
+    dt = DecisionTreeClassifier(seed=SEED)
+    paramGrid = ParamGridBuilder() \
+        .addGrid(dt.maxDepth, MAX_DEPTHS) \
+        .addGrid(dt.impurity, IMPURITIES) \
+        .build()
+    cross_validate_save(dt, paramGrid, model_path)
+    print("Decision tree model saved")
+else:
+    print("Decision tree model already exists")
 
-gbt = GBTClassifier(maxIter=100, seed=451)
-gbt_model = gbt.fit(train)
-eval_model(gbt_model, validate)
+model_path = "models/random_forest"
+if not os.path.exists(model_path):
+    rf = RandomForestClassifier(seed=SEED)
+    paramGrid = ParamGridBuilder() \
+        .addGrid(rf.maxDepth, MAX_DEPTHS) \
+        .addGrid(rf.impurity, IMPURITIES) \
+        .build()
+    cross_validate_save(rf, paramGrid, model_path)
+    print("Random forest model saved")
+else:
+    print("Random forest model already exists")
 
-mlp = MultilayerPerceptronClassifier(layers=[9, 10, 20, 10, 2], maxIter=100, seed=451)
-mlp_model = mlp.fit(train)
-eval_model(mlp_model, validate)
+model_path = "models/gradient_boosted_trees"
+if not os.path.exists(model_path):
+    gbt = GBTClassifier(seed=SEED)
+    paramGrid = ParamGridBuilder() \
+        .addGrid(gbt.maxIter, MAX_ITERS) \
+        .addGrid(gbt.stepSize, STEP_SIZES) \
+        .build()
+    cross_validate_save(gbt, paramGrid, model_path)
+    print("Gradient boosted trees model saved")
+else:
+    print("Gradient boosted trees model already exists")
 
-fmc = FMClassifier(seed=451)
-fmc_model = fmc.fit(train)
-eval_model(fmc_model, validate)
+model_path = "models/multilayer_perceptron"
+if not os.path.exists(model_path):
+    mlp = MultilayerPerceptronClassifier(layers=[INPUTS, 10, 20, 10, 2], seed=SEED)
+    paramGrid = ParamGridBuilder() \
+        .addGrid(mlp.maxIter, MAX_ITERS + [1000]) \
+        .addGrid(mlp.stepSize, STEP_SIZES) \
+        .build()
+    cross_validate_save(mlp, paramGrid, model_path)
+    print("Multilayer perceptron model saved")
+else:
+    print("Multilayer perceptron model already exists")
 
-y_true = [y[0] for y in y_true]
-y_total = [y//3 for y in y_total]
-
-cm = confusion_matrix(y_true, y_total)
-print(cm)
-print(f"Accuracy: {(cm[0][0]+cm[1][1])/cm.sum()}"
-      f", Precision: {cm[1][1]/(cm[1][1]+cm[0][1])}"
-      f", Recall: {cm[1][1]/(cm[1][1]+cm[1][0])}")
+model_path = "models/factorization_machine"
+if not os.path.exists(model_path):
+    fmc = FMClassifier(seed=SEED)
+    paramGrid = ParamGridBuilder() \
+        .addGrid(fmc.regParam, REG_PARAMS) \
+        .build()
+    cross_validate_save(fmc, paramGrid, model_path)
+    print("Factorization machine model saved")
+else:
+    print("Factorization machine model already exists")

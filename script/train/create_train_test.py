@@ -73,8 +73,10 @@ btc_return = btc.join(btc_offset) \
     .map(single_return)
 btc_offset = btc.map(lambda kv: (sub_hour(kv[0]), kv[1]))
 btc_buy = btc.join(btc_offset) \
-    .map(lambda kv: (kv[0], float(kv[1][0] <= kv[1][1])))
-btc = btc_return.join(btc_buy)
+    .map(single_return) \
+    .map(lambda kv: (kv[0], (kv[1], float(kv[1] >= 0))))
+btc = btc_return.join(btc_buy) \
+    .map(lambda kv: (kv[0], (kv[1][0], kv[1][1][0], kv[1][1][1])))
 
 def join_tuples(kv):
     key, tuples = kv
