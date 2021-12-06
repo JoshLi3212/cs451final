@@ -23,10 +23,6 @@ def column_to_array(column):
     return np.array([row[0] for row in column.collect()])
 
 
-def prob_to_array(column):
-    return np.array([row[0][0] for row in column.collect()])
-
-
 def print_confusion_matrix(y_true, y_pred):
     cm = confusion_matrix(y_true, y_pred)
     print(cm)
@@ -59,28 +55,51 @@ test = df.select("label", "features")
 models = [CrossValidatorModel.load(f"models/{model}") for model in MODELS]
 
 y_true = column_to_array(test.select("label"))
+returns = column_to_array(df.select("_c1"))
+
 y_total_vote = np.zeros_like(y_true, dtype=np.float)
 y_total_prob = np.zeros_like(y_true, dtype=np.float)
 
 for model in models:
     prediction = model.transform(test)
     y_pred = column_to_array(prediction.select("prediction"))
-    y_prob = prob_to_array(prediction.select("probability"))
-    print_confusion_matrix(y_true, y_pred)
-    eval_model(prediction)
-
     y_total_vote += y_pred
-    y_total_prob += y_prob
 
-majority = (NUM_MODELS+1)//2
-y_total_vote = np.array([y//majority for y in y_total_vote])
+    vote_returns = y_pred*returns
+    print(f"Total returns for vote: {vote_returns.sum()}")
+
+majority = NUM_MODELS/2
+y_total_vote = np.array([int(y >= majority) for y in y_total_vote])
 print_confusion_matrix(y_true, y_total_vote)
 
-y_total_prob = np.array([int(y >= 0.5*NUM_MODELS) for y in y_total_prob])
-print_confusion_matrix(y_true, y_total_prob)
-
-returns = column_to_array(df.select("_c1"))
 vote_returns = y_total_vote*returns
-prob_returns = y_total_prob*returns
 print(f"Total returns for vote: {vote_returns.sum()}")
-print(f"Total returns for probability: {prob_returns.sum()}")
+
+
+# Output returns graph
+
+import matplotlib.pyplot as plt
+from datetime import datetime, timedelta
+
+y = [1+x for x in vote_returns]
+for i in range(1, len(y)):
+    y[i] *= y[i-1]
+base_date = datetime(year=2021, month=11, day=1)
+x = [base_date + timedelta(hours=i) for i in range(len(y))]
+plt.plot(x, y)
+plt.xlabel("Time")
+plt.ylabel("Returns")
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.savefig("returns.pdf")
+
+y = []
+with open("test.csv", "r") as f:
+    for line in f:
+        label, ret, rest = line.split(",", 2)
+        y.append(1 + float(ret))
+
+for i in range(1, len(y)):
+    y[i] *= y[i-1]
+plt.plot(x, y)
+plt.savefig("comparison.pdf")

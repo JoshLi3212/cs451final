@@ -98,9 +98,9 @@ else:
 
 model_path = "models/multilayer_perceptron"
 if not os.path.exists(model_path):
-    mlp = MultilayerPerceptronClassifier(layers=[INPUTS, 10, 20, 10, 2], seed=SEED)
+    mlp = MultilayerPerceptronClassifier(layers=[INPUTS, 10, 20, 20, 10, 2], seed=SEED)
     paramGrid = ParamGridBuilder() \
-        .addGrid(mlp.maxIter, MAX_ITERS + [1000]) \
+        .addGrid(mlp.maxIter, MAX_ITERS + [500]) \
         .addGrid(mlp.stepSize, STEP_SIZES) \
         .build()
     cross_validate_save(mlp, paramGrid, model_path)
